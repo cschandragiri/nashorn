@@ -17,6 +17,8 @@ import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.SimpleBindings;
 
+import org.apache.log4j.Logger;
+
 import io.vavr.CheckedPredicate;
 import io.vavr.Function2;
 import io.vavr.control.Try;
@@ -27,6 +29,8 @@ import io.vavr.control.Try;
  */
 public class NashornExample1
 {
+	final static Logger logger = Logger.getLogger(NashornExample1.class);
+	
 	public interface PersonService
 	{
 		public String greet(Person person);
@@ -35,12 +39,18 @@ public class NashornExample1
 	public static void main(String args[]) throws Exception
 	{
 		ScriptEngine engine = new ScriptEngineManager().getEngineByName("nashorn");
-		Bindings bindings = new SimpleBindings(
+		Bindings localBindings = new SimpleBindings(
 				Stream.of(new SimpleEntry<>("a", 10), new SimpleEntry<>("b", 20))
 						.collect(Collectors.toMap(SimpleEntry::getKey, SimpleEntry::getValue)));
-		engine.setBindings(bindings, ScriptContext.ENGINE_SCOPE);
+		engine.setBindings(localBindings, ScriptContext.ENGINE_SCOPE);
+		
+		Bindings globalBindings = engine.getBindings(ScriptContext.GLOBAL_SCOPE);
+		/** Bind log4j logger to global scope for debugging purposes **/
+		globalBindings.put("logger", logger);
+		engine.setBindings(globalBindings, ScriptContext.ENGINE_SCOPE);
+		
 		Try.of(() -> engine.eval(new FileReader("src/main/java/com/sandbox/samples/example1.js")))
-				.onFailure(System.out::println);
+				.onFailure(logger::error);
 
 		List<Person> list2 = new ArrayList<Person>();
 		list2.add(new Person("Jack", 21, "01/05/2017"));
@@ -54,7 +64,7 @@ public class NashornExample1
 		list2.add(new Person("Christie", 29, "09/05/2017"));
 		list2.add(new Person(null, 25, "10/05/2017"));
 		list2.add(new Person("Smith", 40, "11/05/2017"));
-		list2.add(new Person("Smith", 23, "12/05/2017"));
+		list2.add(new Person("Smith", 23, null));
 
 		Invocable invocable = (Invocable) engine;
 		CheckedPredicate<Person> predicate = e ->
@@ -71,7 +81,7 @@ public class NashornExample1
 		{
 			return Try.of(() -> invocable.invokeFunction("limit"))
 					.filter(e -> e != null && e instanceof Integer)
-					.onFailure(System.out::println)
+					.onFailure(logger::error)
 					.map(Integer.class::cast)
 					.getOrElse(10);
 		};
@@ -80,7 +90,7 @@ public class NashornExample1
 		{
 			return Try.of(() -> invocable.invokeFunction("comparator", e1, e2))
 					.filter(e -> e != null && e instanceof Integer)
-					.onFailure(System.out::println)
+					.onFailure(logger::error)
 					.map(Integer.class::cast)
 					.getOrElse(0);
 		};
@@ -89,7 +99,7 @@ public class NashornExample1
 		{
 			return Try.of(() -> invocable.invokeFunction("runTimeMapper", e1))
 					.filter(e -> e != null)
-					.onFailure(System.out::println)
+					.onFailure(logger::error)
 					.getOrNull();
 		};
 
@@ -99,7 +109,7 @@ public class NashornExample1
 				{
 					return Try.of(() -> e)
 							.filterTry(predicate)
-							.onFailure(System.out::println)
+							.onFailure(logger::error)
 							.isSuccess();
 				})
 				.sorted((e1, e2) -> comparator.apply(e1, e2))

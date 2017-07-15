@@ -1,3 +1,5 @@
+load("http://underscorejs.org/underscore-min.js");
+
 var filter = function(name) {
     return name.getName() != null && name.getAge() > 18;
 };
@@ -25,16 +27,20 @@ var JDateTimeFormatter = Java.type("java.time.format.DateTimeFormatter");
 var JFunction = Java.type('java.util.function.Function');
 
 var dateMapperFunction = new JFunction() {
-    apply: function(dateString) {
+    apply: function(person) {
+    	if (_.isNull(person.getGraduationDate())) {
+    		logger.error("Date String is null for user: " + person.getName());
+    		return
+    	}
     	var inputFormatter = JDateTimeFormatter.ofPattern("MM/dd/yyyy");
-    	var date = JLocalDate.from(inputFormatter.parse(dateString));
+    	var date = JLocalDate.from(inputFormatter.parse(person.getGraduationDate()));
     	var outputFormatter = JDateTimeFormatter.ofPattern("yyyy-MM-dd");
     	return date.format(outputFormatter);
     }
 };
 
 var runTimeMapper = function(x) {
-	return dateMapperFunction(x.getGraduationDate());
+	return dateMapperFunction(x);
 };
 
 var greet = function(person) {
