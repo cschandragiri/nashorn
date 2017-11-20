@@ -14,7 +14,7 @@ public class NashornExample2
 	{
 		ScriptEngine engine = new ScriptEngineManager().getEngineByName("nashorn");
 		Person obj = Try
-				.of(() -> engine.eval(new FileReader("src/main/java/com/sandbox/samples/example2.js")))
+				.of(() -> engine.eval(new FileReader("src/main/resources/example2.js")))
 				.onFailure(System.out::println)
 				.map(e -> (Person) e)
 				.getOrNull();
