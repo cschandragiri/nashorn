@@ -50,8 +50,8 @@ var ageMapperFunction = new JFunction() {
 };
 
 var runTimeMapper = function(x) {
-	//return dateMapperFunction(x);
-	return ageMapperFunction(x)
+	return dateMapperFunction(x);
+	//return ageMapperFunction(x)
 };
 
 var greet = function(person) {

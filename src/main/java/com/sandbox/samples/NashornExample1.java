@@ -4,9 +4,6 @@ import java.io.FileReader;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
-import java.util.function.BiFunction;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -19,8 +16,6 @@ import javax.script.SimpleBindings;
 
 import org.apache.log4j.Logger;
 
-import io.vavr.CheckedPredicate;
-import io.vavr.Function3;
 import io.vavr.control.Try;
 
 /**
@@ -34,51 +29,6 @@ public class NashornExample1 {
 		public String greet(Person person);
 	}
 
-	public static CheckedPredicate<Person> getPredicate(Invocable invocable) {
-		CheckedPredicate<Person> predicate = e -> {
-			Object result = invocable.invokeFunction("filter", e);
-			if (!Objects.isNull(result) && result instanceof Boolean) {
-				return (boolean) result;
-			}
-			return false;
-		};
-		return predicate;
-	}
-
-	/**
-	 * Get the limit value from JS side
-	 */
-	public static Function<Invocable, Integer> limiter = (invocable) -> {
-		return Try.of(() -> invocable.invokeFunction("limit"))
-				.filter(e -> e != null && e instanceof Integer)
-				.onFailure(logger::error)
-				.map(Integer.class::cast)
-				.getOrElse(10);
-	};
-
-	/**
-	 * Here, we get the mapping function from the JS side
-	 */
-	public static BiFunction<Invocable, Person, Object> runTimeMapper = (invocable,
-			person) -> {
-		return Try.of(() -> invocable.invokeFunction("runTimeMapper", person))
-				.filter(e -> e != null)
-				.onFailure(logger::error)
-				.getOrNull();
-	};
-
-	/**
-	 * Person Comparator abstracted out to js side
-	 */
-	public static Function3<Invocable, Person, Person, Integer> comparator = (invocable,
-			person1, person2) -> {
-		return Try.of(() -> invocable.invokeFunction("comparator", person1, person2))
-				.filter(e -> e != null && e instanceof Integer)
-				.onFailure(logger::error)
-				.map(Integer.class::cast)
-				.getOrElse(0);
-	};
-	
 	public static void main(String args[]) throws Exception {
 		ScriptEngine engine = new ScriptEngineManager().getEngineByName("nashorn");
 		Bindings localBindings = new SimpleBindings(Stream
@@ -91,8 +41,7 @@ public class NashornExample1 {
 		globalBindings.put("logger", logger);
 		engine.setBindings(globalBindings, ScriptContext.ENGINE_SCOPE);
 
-		Try.of(() -> engine
-				.eval(new FileReader("src/main/resources/example1.js")))
+		Try.of(() -> engine.eval(new FileReader("src/main/resources/example1.js")))
 				.onFailure(logger::error);
 
 		Invocable invocable = (Invocable) engine;
@@ -102,25 +51,27 @@ public class NashornExample1 {
 		List<Person> output = getDataSet().stream()
 				.filter(e -> {
 					return Try.of(() -> e)
-							.filterTry(getPredicate(invocable))
+							.filterTry(UtilityFunctions.getPredicate(invocable))
 							.onFailure(logger::error)
 							.isSuccess();
 				})
-				.sorted((e1, e2) -> comparator.apply(invocable, e1, e2))
-				.limit(limiter.apply(invocable))
+				.sorted((e1, e2) -> UtilityFunctions.comparator.apply(invocable, logger,
+						e1, e2))
+				.limit(UtilityFunctions.limiter.apply(invocable, logger))
 				.collect(Collectors.toList());
 		System.out.println("Filtered person: " + output);
 
 		/**********
 		 * Map person to Object, the mapping logic is delegated to javascript
 		 **********/
-		/*List<Object> dates = getDataSet().stream()
-				.map(e -> runTimeMapper.apply(invocable, e))
-				.collect(Collectors.toList());
-		System.out.println("Dates: " + dates);*/
-		
+		/*
+		 * List<Object> dates = getDataSet().stream() .map(e ->
+		 * runTimeMapper.apply(invocable, e)) .collect(Collectors.toList());
+		 * System.out.println("Dates: " + dates);
+		 */
+
 		List<Object> ages = getDataSet().stream()
-				.map(e -> runTimeMapper.apply(invocable, e))
+				.map(e -> UtilityFunctions.runTimeMapper.apply(invocable, logger, e))
 				.collect(Collectors.toList());
 		System.out.println("Age: " + ages);
 
